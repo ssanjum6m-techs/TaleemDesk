@@ -180,6 +180,16 @@ export default function TaleemDesk() {
   const [copied, setCopied] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [certData, setCertData] = useState(null);
+  const [logoUrl, setLogoUrl] = useState(null);
+  const [signUrl, setSignUrl] = useState(null);
+
+  const readImg = (e, setter) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => setter(r.result);
+    r.readAsDataURL(f);
+  };
 
   const isCertType = (t) => /certificate/i.test(t);
 
@@ -189,6 +199,7 @@ export default function TaleemDesk() {
       <div className="td-certinner">
         <div className="td-certcorner tl" /><div className="td-certcorner tr" />
         <div className="td-certcorner bl" /><div className="td-certcorner br" />
+        {logoUrl && <img className="td-certlogo" src={logoUrl} alt="School logo" />}
         <div className="td-certschool">{school}</div>
         <div className="td-certtitle">{data.title}</div>
         <div className="td-certrule" />
@@ -197,8 +208,13 @@ export default function TaleemDesk() {
         <div className="td-certbody">{data.bodyText}</div>
         <div className="td-certdate">{data.dateLine}</div>
         <div className="td-certsigs">
-          <div className="td-certsig"><div className="td-certsigline" />{data.principalName || "Principal"}<br /><span>Principal</span></div>
-          <div className="td-certseal">ت</div>
+          <div className="td-certsig">
+            {signUrl && <img className="td-certsignimg" src={signUrl} alt="Signature" />}
+            <div className="td-certsigline" />{data.principalName || "Principal"}<br /><span>Principal</span>
+          </div>
+          <div className="td-certseal">
+            {logoUrl ? <img className="td-certseallogo" src={logoUrl} alt="" /> : "ت"}
+          </div>
           <div className="td-certsig"><div className="td-certsigline" />______________<br /><span>Coordinator</span></div>
         </div>
       </div>
@@ -362,7 +378,15 @@ Rules:
           margin: certData ? 0 : [10, 10, 12, 10],
           filename: fileName,
           image: { type: "jpeg", quality: 0.96 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            // FIX: the hidden source sits off-screen; reposition it inside the clone
+            onclone: (clonedDoc) => {
+              const e = clonedDoc.getElementById("td-pdf-source");
+              if (e) { e.style.position = "static"; e.style.left = "0"; e.style.top = "0"; }
+            },
+          },
           jsPDF: { unit: "mm", format: "a4", orientation: certData ? "landscape" : "portrait" },
           pagebreak: { mode: ["css", "legacy"] },
         })
