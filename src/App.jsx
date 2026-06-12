@@ -178,6 +178,32 @@ export default function TaleemDesk() {
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [certData, setCertData] = useState(null);
+
+  const isCertType = (t) => /certificate/i.test(t);
+
+  // ---------- Designed Certificate (green & gold TaleemDesk style) ----------
+  const Certificate = ({ data, school, em }) => (
+    <div className="td-cert" style={{ fontSize: em }}>
+      <div className="td-certinner">
+        <div className="td-certcorner tl" /><div className="td-certcorner tr" />
+        <div className="td-certcorner bl" /><div className="td-certcorner br" />
+        <div className="td-certschool">{school}</div>
+        <div className="td-certtitle">{data.title}</div>
+        <div className="td-certrule" />
+        <div className="td-certlead">This is to certify that</div>
+        <div className="td-certname">{data.studentName}</div>
+        <div className="td-certbody">{data.bodyText}</div>
+        <div className="td-certdate">{data.dateLine}</div>
+        <div className="td-certsigs">
+          <div className="td-certsig"><div className="td-certsigline" />{data.principalName || "Principal"}<br /><span>Principal</span></div>
+          <div className="td-certseal">ت</div>
+          <div className="td-certsig"><div className="td-certsigline" />______________<br /><span>Coordinator</span></div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Lesson planner state
   const [lp, setLp] = useState({
@@ -205,7 +231,7 @@ export default function TaleemDesk() {
     const l = document.createElement("link");
     l.rel = "stylesheet";
     l.href =
-      "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap";
+      "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&family=Great+Vibes&display=swap";
     document.head.appendChild(l);
     return () => document.head.removeChild(l);
   }, []);
@@ -244,10 +270,29 @@ If language is Bilingual, write key instructions in English with Urdu support ph
   };
 
   const generateDoc = async () => {
-    setError(""); setLoading(true); setOutput("");
+    setError(""); setLoading(true); setOutput(""); setCertData(null);
     try {
-      const text = await askClaude(
-        `You are the senior administrative officer of a Pakistani school with 20 years of experience. Draft this official school document, fully formatted and ready to print.
+      if (isCertType(doc.docType)) {
+        const raw = await askClaude(
+          `You are a Pakistani school administrator. Create the text content for this certificate.
+
+School: ${doc.school}
+Certificate type: ${doc.docType}
+Class: ${doc.grade}
+Language: ${doc.language}
+Details from principal: ${doc.details || "Use placeholders like [Student Name] where missing."}
+
+Respond ONLY with a JSON object, no markdown, no backticks, no extra text:
+{"title":"certificate heading in capital-style words","studentName":"the student or teacher name, or [Student Name]","bodyText":"2-3 elegant lines of certificate body text (mention class, session, conduct as relevant)","dateLine":"Given this [day] of [month], [year] OR with real date if provided","principalName":"principal name if given, else empty string"}
+If language is Urdu or Bilingual, bodyText may include an Urdu line as well.`
+        );
+        const clean = raw.replace(/```json|```/g, "").trim();
+        const data = JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+        setCertData(data);
+        setOutput("certificate"); // flag so action buttons appear
+      } else {
+        const text = await askClaude(
+          `You are the senior administrative officer of a Pakistani school with 20 years of experience. Draft this official school document, fully formatted and ready to print.
 
 School: ${doc.school}
 Document type: ${doc.docType}
@@ -263,17 +308,21 @@ Rules:
 - If language is Urdu or Bilingual, write the Urdu portions in proper formal Urdu (دفتری اردو).
 - Use markdown: ## for the document title, ### for sections, bold (**) for labels, - for lists.
 - Keep tone respectful and formal, as used in Punjab schools. No extra commentary — output the document only.`
-      );
-      setOutput(text);
+        );
+        setOutput(text);
+      }
     } catch (e) { setError("Generation failed. Please try again."); }
     setLoading(false);
   };
 
   const copyOut = async () => {
     try {
-      await navigator.clipboard.writeText(output);
+      const txt = certData
+        ? `${certData.title}\n\nThis is to certify that\n${certData.studentName}\n${certData.bodyText}\n${certData.dateLine}`
+        : output;
+      await navigator.clipboard.writeText(txt);
       setCopied(true); setTimeout(() => setCopied(false), 1500);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const printOut = () => {
@@ -285,6 +334,44 @@ Rules:
         .replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>
       <script>window.print()</script></body></html>`);
     w.document.close();
+  };
+
+  // ---------- Designed A4 PDF download (html2pdf.js from CDN) ----------
+  const downloadPDF = async () => {
+    if (!output || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      if (!window.html2pdf) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("PDF library failed to load"));
+          document.head.appendChild(s);
+        });
+      }
+      const el = document.getElementById("td-pdf-source");
+      const rawName = certData
+        ? `${doc.docType}-${certData.studentName || ""}`
+        : tab === "lesson" ? (lp.topic || "Lesson-Plan") : doc.docType;
+      const fileName =
+        "TaleemDesk-" + rawName.replace(/[^A-Za-z0-9\u0600-\u06FF ]/g, "").trim().replace(/\s+/g, "-").slice(0, 45) + ".pdf";
+      await window
+        .html2pdf()
+        .set({
+          margin: certData ? 0 : [10, 10, 12, 10],
+          filename: fileName,
+          image: { type: "jpeg", quality: 0.96 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: certData ? "landscape" : "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        })
+        .from(el)
+        .save();
+    } catch (e) {
+      setError("PDF download failed — please try the Print button instead.");
+    }
+    setPdfBusy(false);
   };
 
   const field = (label, el) => (
@@ -349,6 +436,49 @@ Rules:
         .td-mini{padding:8px 14px;border:1px solid #134E33;background:#fff;color:#134E33;border-radius:7px;font-size:13px;
           font-weight:600;cursor:pointer;font-family:inherit}
         .td-mini:hover{background:#F0F5F1}
+        .td-pdfbtn{background:#134E33;color:#F4EFE3;border-color:#134E33}
+        .td-pdfbtn:hover{background:#0F4029}
+        .td-pdfbtn:disabled{opacity:.6;cursor:wait}
+        /* offscreen designed A4 page for PDF export */
+        .td-pdfpage{position:fixed;left:-12000px;top:0;width:740px;background:#fff;color:#1C2520;
+          font-family:'Inter',system-ui,sans-serif;font-size:13.5px;line-height:1.65;padding:0}
+        .td-pdfhead{background:#134E33;color:#F4EFE3;padding:18px 26px;border-bottom:4px solid #B98A2F}
+        .td-pdfschool{font-family:'Fraunces',serif;font-weight:900;font-size:23px;letter-spacing:.3px}
+        .td-pdfmeta{font-size:12px;opacity:.9;margin-top:4px;letter-spacing:.04em}
+        .td-pdfbody{padding:20px 30px 26px}
+        .td-pdfbody .td-h2{font-size:19px}
+        .td-pdfbody .td-h3{page-break-after:avoid}
+        .td-pdfbody ul,.td-pdfbody p{page-break-inside:avoid}
+        .td-pdffoot{border-top:1px solid #D7CFBC;margin:0 30px;padding:10px 0 18px;font-size:10.5px;color:#8A8474}
+        .td-pdfland{width:1052px;padding:0}
+        /* ---- designed certificate (green & gold) ---- */
+        .td-cert{background:#fff;border:0.6em solid #134E33;padding:0.55em;width:100%;box-sizing:border-box;
+          aspect-ratio:1052/744;font-family:'Inter',sans-serif;color:#1C2520}
+        .td-pdfland .td-cert{width:1052px;height:744px;aspect-ratio:auto}
+        .td-certinner{border:0.18em solid #B98A2F;height:100%;box-sizing:border-box;position:relative;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+          padding:1.5em 3em;overflow:hidden}
+        .td-certcorner{position:absolute;width:5em;height:5em;background:
+          linear-gradient(135deg,#134E33 0 38%,#B98A2F 38% 48%,transparent 48%)}
+        .td-certcorner.tl{top:-0.1em;left:-0.1em}
+        .td-certcorner.tr{top:-0.1em;right:-0.1em;transform:rotate(90deg)}
+        .td-certcorner.br{bottom:-0.1em;right:-0.1em;transform:rotate(180deg)}
+        .td-certcorner.bl{bottom:-0.1em;left:-0.1em;transform:rotate(270deg)}
+        .td-certschool{font-size:0.95em;letter-spacing:0.35em;text-transform:uppercase;color:#B98A2F;font-weight:700}
+        .td-certtitle{font-family:'Fraunces',serif;font-weight:900;font-size:2.5em;color:#134E33;margin-top:0.3em;
+          letter-spacing:0.04em;text-transform:uppercase}
+        .td-certrule{width:9em;border-top:0.15em solid #B98A2F;margin:0.9em 0}
+        .td-certlead{font-size:1em;color:#4A5248;font-style:italic}
+        .td-certname{font-family:'Great Vibes',cursive;font-size:3.4em;color:#1C2520;margin:0.12em 0;line-height:1.15}
+        .td-certbody{font-size:1.05em;max-width:34em;line-height:1.7;color:#33402F}
+        .td-certdate{font-size:0.95em;color:#4A5248;margin-top:1em;font-style:italic}
+        .td-certsigs{display:flex;align-items:flex-end;justify-content:space-between;width:100%;margin-top:1.8em;gap:1em}
+        .td-certsig{font-size:0.9em;font-weight:600;text-align:center;min-width:11em}
+        .td-certsig span{font-weight:400;color:#8A8474;font-size:0.85em}
+        .td-certsigline{border-top:1px solid #1C2520;margin-bottom:0.4em}
+        .td-certseal{width:4.2em;height:4.2em;border:0.2em solid #B98A2F;border-radius:50%;display:flex;
+          align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:900;font-size:1.4em;
+          color:#134E33;background:radial-gradient(circle,#FDF8EC 60%,#F2E5C4)}
         .td-err{background:#FBEDE9;border:1px solid #D95B43;color:#8C2F1B;padding:10px 12px;border-radius:7px;
           font-size:13px;margin-bottom:12px}
         .td-srcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
@@ -386,7 +516,7 @@ Rules:
         ].map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id}
             className={"td-tab" + (tab === id ? " on" : "")}
-            onClick={() => { setTab(id); setOutput(""); setError(""); }}>
+            onClick={() => { setTab(id); setOutput(""); setError(""); setCertData(null); }}>
             {label}
           </button>
         ))}
@@ -472,16 +602,21 @@ Rules:
           <section>
             {output && (
               <div className="td-actions">
+                <button className="td-mini td-pdfbtn" onClick={downloadPDF} disabled={pdfBusy}>
+                  {pdfBusy ? "Preparing PDF…" : "📥 Download PDF"}
+                </button>
                 <button className="td-mini" onClick={copyOut}>{copied ? "✓ Copied" : "Copy text"}</button>
-                <button className="td-mini" onClick={printOut}>Print / Save PDF</button>
+                <button className="td-mini" onClick={printOut}>Print</button>
               </div>
             )}
-            <div className="td-copy">
+            <div className={certData ? "" : "td-copy"}>
               {loading ? (
-                <div className="td-empty">
+                <div className="td-empty td-copy" style={{ border: "none" }}>
                   <div className="td-spin" />
                   <span>Writing on the school copy…</span>
                 </div>
+              ) : certData ? (
+                <Certificate data={certData} school={doc.school} em="clamp(7px, 1.55vw, 15px)" />
               ) : output ? (
                 renderMD(output)
               ) : (
@@ -492,6 +627,30 @@ Rules:
               )}
             </div>
           </section>
+
+          {/* Hidden, designed A4 page used only for PDF export */}
+          {output && (
+            certData ? (
+              <div id="td-pdf-source" className="td-pdfpage td-pdfland" aria-hidden="true">
+                <Certificate data={certData} school={doc.school} em="16px" />
+              </div>
+            ) : (
+              <div id="td-pdf-source" className="td-pdfpage" aria-hidden="true">
+                <div className="td-pdfhead">
+                  <div className="td-pdfschool">{tab === "lesson" ? lp.school : doc.school}</div>
+                  <div className="td-pdfmeta">
+                    {tab === "lesson"
+                      ? `Lesson Plan • ${lp.subject} • ${lp.grade} • ${lp.board}`
+                      : `${doc.docType}`}
+                  </div>
+                </div>
+                <div className="td-pdfbody">{renderMD(output)}</div>
+                <div className="td-pdffoot">
+                  Generated with TaleemDesk — AI-TEG Academy &nbsp;•&nbsp; Date: {new Date().toLocaleDateString("en-PK")}
+                </div>
+              </div>
+            )
+          )}
         </main>
       )}
     </div>
