@@ -417,15 +417,22 @@ Rules:
     setPdfBusy(true);
     let holder = null;
     try {
-      if (!window.html2pdf) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-          s.onload = resolve;
-          s.onerror = () => reject(new Error("PDF library failed to load"));
-          document.head.appendChild(s);
+      const loadScript = (src) =>
+        new Promise((resolve, reject) => {
+          const sc = document.createElement("script");
+          sc.src = src;
+          sc.onload = resolve;
+          sc.onerror = () => reject(new Error("Library failed to load: " + src));
+          document.head.appendChild(sc);
         });
-      }
+      // Load html2canvas and jsPDF as their own libraries (reliable globals),
+      // plus html2pdf for the multi-page document flow.
+      if (!window.html2canvas)
+        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+      if (!(window.jspdf && window.jspdf.jsPDF))
+        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      if (!window.html2pdf)
+        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
       const fmt = currentFormat();
       const src = document.getElementById("td-pdf-source");
       if (!src) throw new Error("Nothing to export yet.");
@@ -480,44 +487,27 @@ Rules:
       const fileName =
         "TaleemDesk-" + rawName.replace(/[^A-Za-z0-9\u0600-\u06FF ]/g, "").trim().replace(/\s+/g, "-").slice(0, 45) + ".pdf";
 
-      // CERTIFICATE: capture, then shrink-to-fit onto exactly ONE page (never cut).
+      // CERTIFICATE: capture full content, then shrink-to-fit onto ONE page.
       if (certData) {
         const target = certEl || clone;
-        // html2pdf bundle exposes these on window; fall back across known names.
-        const h2c = window.html2canvas || (window.html2pdf && window.html2pdf.html2canvas);
-        const JsPDFCtor =
-          (window.jspdf && window.jspdf.jsPDF) ||
-          window.jsPDF ||
-          (window.html2pdf && window.html2pdf.jsPDF);
-        if (!h2c || !JsPDFCtor) {
-          // Fallback: use html2pdf's own single-page pipeline
-          await window.html2pdf().set({
-            margin: 4,
-            filename: fileName,
-            image: { type: "jpeg", quality: 0.96 },
-            html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false },
-            jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-            pagebreak: { mode: ["avoid-all"] },
-          }).from(target).save();
-        } else {
-          const canvas = await h2c(target, {
-            scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false,
-          });
-          const pdf = new JsPDFCtor({ unit: "mm", format: "a4", orientation: "landscape" });
-          const pageW = pdf.internal.pageSize.getWidth();
-          const pageH = pdf.internal.pageSize.getHeight();
-          const margin = 6;
-          const availW = pageW - margin * 2;
-          const availH = pageH - margin * 2;
-          const imgRatio = canvas.width / canvas.height;
-          let drawW = availW;
-          let drawH = drawW / imgRatio;
-          if (drawH > availH) { drawH = availH; drawW = drawH * imgRatio; }
-          const x = (pageW - drawW) / 2;
-          const y = (pageH - drawH) / 2;
-          pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, y, drawW, drawH);
-          pdf.save(fileName);
-        }
+        const canvas = await window.html2canvas(target, {
+          scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false,
+        });
+        const JsPDFCtor = window.jspdf.jsPDF;
+        const pdf = new JsPDFCtor({ unit: "mm", format: "a4", orientation: "landscape" });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const margin = 6;
+        const availW = pageW - margin * 2;
+        const availH = pageH - margin * 2;
+        const imgRatio = canvas.width / canvas.height;
+        let drawW = availW;
+        let drawH = drawW / imgRatio;
+        if (drawH > availH) { drawH = availH; drawW = drawH * imgRatio; }
+        const x = (pageW - drawW) / 2;
+        const y = (pageH - drawH) / 2;
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, y, drawW, drawH);
+        pdf.save(fileName);
       } else {
         // Letters / forms / lesson plans: normal multi-page flow.
         await window.html2pdf().set({
