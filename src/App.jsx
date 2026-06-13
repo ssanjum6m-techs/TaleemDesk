@@ -185,21 +185,21 @@ function renderMD(text) {
   return out;
 }
 
-// ---------- Claude API ----------
-// ---------- PREVIEW MODE: direct call (works inside Claude artifacts) ----------
-async function askClaude(prompt) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  const data = await res.json();
-  return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-}
+// // ---------- Claude API ----------
+// // ---------- PREVIEW MODE: direct call (works inside Claude artifacts) ----------
+// async function askClaude(prompt) {
+//   const res = await fetch("https://api.anthropic.com/v1/messages", {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({
+//       model: "claude-sonnet-4-6",
+//       max_tokens: 1500,
+//       messages: [{ role: "user", content: prompt }],
+//     }),
+//   });
+//   const data = await res.json();
+//   return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+// }
 
 export default function TaleemDesk() {
   const [tab, setTab] = useState("lesson");
