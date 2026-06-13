@@ -430,51 +430,48 @@ Rules:
       const src = document.getElementById("td-pdf-source");
       if (!src) throw new Error("Nothing to export yet.");
 
-      // Build a fully visible, on-screen wrapper so the capture engine can see it.
+      const renderW = certData ? 1122 : fmt.w;
+
+      // Build a visible (but near-invisible) wrapper so the renderer can see it.
       holder = document.createElement("div");
       holder.style.position = "fixed";
       holder.style.left = "0";
       holder.style.top = "0";
       holder.style.zIndex = "2147483647";
       holder.style.background = "#fff";
-      holder.style.width = (certData ? 1122 : fmt.w) + "px";
-      holder.style.opacity = "0.01"; // visible to renderer, invisible to user
+      holder.style.width = renderW + "px";
+      holder.style.opacity = "0.01";
       holder.style.pointerEvents = "none";
 
       const clone = src.cloneNode(true);
       clone.removeAttribute("id");
       clone.style.position = "static";
-      clone.style.left = "auto";
-      clone.style.top = "auto";
-      clone.style.width = (certData ? 1122 : fmt.w) + "px";
+      clone.style.width = renderW + "px";
       clone.style.background = "#fff";
       clone.style.border = "none";
       clone.style.borderRadius = "0";
       clone.style.boxShadow = "none";
+
+      // For certificates: let height grow to fit ALL content (no clipping).
       const certEl = clone.querySelector(".td-cert");
       if (certEl) {
-        // Lock the certificate to exact landscape-A4 proportions (297 x 210 mm).
-        // Capturing at this exact ratio means it maps to ONE page with no cut-off.
         certEl.style.fontSize = "15px";
-        certEl.style.width = "1122px";
-        certEl.style.height = "793px";
+        certEl.style.width = renderW + "px";
+        certEl.style.height = "auto";
         certEl.style.aspectRatio = "auto";
         certEl.style.display = "block";
         certEl.style.boxSizing = "border-box";
+        const inner = certEl.querySelector(".td-certinner");
+        if (inner) { inner.style.height = "auto"; inner.style.overflow = "visible"; }
       }
       holder.appendChild(clone);
       document.body.appendChild(holder);
 
-      // wait for images (logo/signature/letterhead) to finish loading
+      // wait for images (logo/signature/letterhead)
       const imgs = Array.from(holder.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map((img) =>
-          img.complete
-            ? Promise.resolve()
-            : new Promise((r) => { img.onload = r; img.onerror = r; })
-        )
-      );
-      // small delay so fonts/layout settle
+      await Promise.all(imgs.map((img) =>
+        img.complete ? Promise.resolve() : new Promise((r) => { img.onload = r; img.onerror = r; })
+      ));
       await new Promise((r) => setTimeout(r, 350));
 
       const rawName = certData
@@ -483,18 +480,38 @@ Rules:
       const fileName =
         "TaleemDesk-" + rawName.replace(/[^A-Za-z0-9\u0600-\u06FF ]/g, "").trim().replace(/\s+/g, "-").slice(0, 45) + ".pdf";
 
-      await window
-        .html2pdf()
-        .set({
-          margin: certData ? 0 : fmt.size === "a5" ? [6, 6, 8, 6] : [10, 10, 12, 10],
+      // CERTIFICATE: capture, then shrink-to-fit onto exactly ONE page (never cut).
+      if (certData) {
+        const target = certEl || clone;
+        const canvas = await window.html2canvas(target, {
+          scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false,
+        });
+        const { jsPDF } = window.jspdf || window;
+        const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
+        const pageW = pdf.internal.pageSize.getWidth();   // 297
+        const pageH = pdf.internal.pageSize.getHeight();  // 210
+        const margin = 6;
+        const availW = pageW - margin * 2;
+        const availH = pageH - margin * 2;
+        const imgRatio = canvas.width / canvas.height;
+        let drawW = availW;
+        let drawH = drawW / imgRatio;
+        if (drawH > availH) { drawH = availH; drawW = drawH * imgRatio; }
+        const x = (pageW - drawW) / 2;
+        const y = (pageH - drawH) / 2;
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, y, drawW, drawH);
+        pdf.save(fileName);
+      } else {
+        // Letters / forms / lesson plans: normal multi-page flow.
+        await window.html2pdf().set({
+          margin: fmt.size === "a5" ? [6, 6, 8, 6] : [10, 10, 12, 10],
           filename: fileName,
           image: { type: "jpeg", quality: 0.96 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false },
           jsPDF: { unit: "mm", format: fmt.size, orientation: fmt.orient },
-          pagebreak: certData ? { mode: [] } : { mode: ["css", "legacy"] },
-        })
-        .from(clone)
-        .save();
+          pagebreak: { mode: ["css", "legacy"] },
+        }).from(clone).save();
+      }
     } catch (e) {
       setError("PDF download failed: " + (e.message || "try the Print button instead."));
     }
@@ -621,11 +638,11 @@ Rules:
         .td-pdfland{width:1052px;padding:0}
         /* ---- designed certificate (green & gold) ---- */
         .td-cert{background:#fff;border:0.6em solid #134E33;padding:0.55em;width:100%;box-sizing:border-box;
-          aspect-ratio:1052/744;font-family:'Inter',sans-serif;color:#1C2520}
-        .td-pdfland .td-cert{width:1052px;height:744px;aspect-ratio:auto}
-        .td-certinner{border:0.18em solid #B98A2F;height:100%;box-sizing:border-box;position:relative;
-          display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;text-align:center;
-          padding:1.4em 3em;overflow:hidden}
+          min-height:0;font-family:'Inter',sans-serif;color:#1C2520}
+        .td-pdfland .td-cert{width:1052px;height:auto;aspect-ratio:auto}
+        .td-certinner{border:0.18em solid #B98A2F;min-height:34em;box-sizing:border-box;position:relative;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+          padding:2em 3em;overflow:visible;gap:0.55em}
         .td-certcorner{position:absolute;width:5em;height:5em;background:
           linear-gradient(135deg,#134E33 0 38%,#B98A2F 38% 48%,transparent 48%)}
         .td-certcorner.tl{top:-0.1em;left:-0.1em}
