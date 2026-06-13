@@ -453,10 +453,12 @@ Rules:
       clone.style.boxShadow = "none";
       const certEl = clone.querySelector(".td-cert");
       if (certEl) {
-        certEl.style.fontSize = "16px";
+        certEl.style.fontSize = "15px";
         certEl.style.width = "1052px";
+        certEl.style.minHeight = "744px";
         certEl.style.height = "744px";
         certEl.style.aspectRatio = "auto";
+        certEl.style.display = "block";
       }
       holder.appendChild(clone);
       document.body.appendChild(holder);
@@ -621,29 +623,29 @@ Rules:
         .td-pdfland .td-cert{width:1052px;height:744px;aspect-ratio:auto}
         .td-certinner{border:0.18em solid #B98A2F;height:100%;box-sizing:border-box;position:relative;
           display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
-          padding:1.5em 3em;overflow:hidden}
+          padding:1.1em 3em;overflow:hidden}
         .td-certcorner{position:absolute;width:5em;height:5em;background:
           linear-gradient(135deg,#134E33 0 38%,#B98A2F 38% 48%,transparent 48%)}
         .td-certcorner.tl{top:-0.1em;left:-0.1em}
         .td-certcorner.tr{top:-0.1em;right:-0.1em;transform:rotate(90deg)}
         .td-certcorner.br{bottom:-0.1em;right:-0.1em;transform:rotate(180deg)}
         .td-certcorner.bl{bottom:-0.1em;left:-0.1em;transform:rotate(270deg)}
-        .td-certschool{font-size:0.95em;letter-spacing:0.35em;text-transform:uppercase;color:#B98A2F;font-weight:700}
-        .td-certtitle{font-family:'Fraunces',serif;font-weight:900;font-size:2.5em;color:#134E33;margin-top:0.3em;
+        .td-certschool{font-size:0.9em;letter-spacing:0.3em;text-transform:uppercase;color:#B98A2F;font-weight:700}
+        .td-certtitle{font-family:'Fraunces',serif;font-weight:900;font-size:2.2em;color:#134E33;margin-top:0.15em;
           letter-spacing:0.04em;text-transform:uppercase}
-        .td-certrule{width:9em;border-top:0.15em solid #B98A2F;margin:0.9em 0}
+        .td-certrule{width:9em;border-top:0.15em solid #B98A2F;margin:0.55em 0}
         .td-certlead{font-size:1em;color:#4A5248;font-style:italic}
-        .td-certname{font-family:'Great Vibes',cursive;font-size:3.4em;color:#1C2520;margin:0.12em 0;line-height:1.15}
-        .td-certbody{font-size:1.05em;max-width:34em;line-height:1.7;color:#33402F}
-        .td-certdate{font-size:0.95em;color:#4A5248;margin-top:1em;font-style:italic}
-        .td-certsigs{display:flex;align-items:flex-end;justify-content:space-between;width:100%;margin-top:1.8em;gap:1em}
+        .td-certname{font-family:'Great Vibes',cursive;font-size:2.9em;color:#1C2520;margin:0.05em 0;line-height:1.1}
+        .td-certbody{font-size:0.98em;max-width:36em;line-height:1.55;color:#33402F}
+        .td-certdate{font-size:0.92em;color:#4A5248;margin-top:0.6em;font-style:italic}
+        .td-certsigs{display:flex;align-items:flex-end;justify-content:space-between;width:100%;margin-top:1.1em;gap:1em}
         .td-certsig{font-size:0.9em;font-weight:600;text-align:center;min-width:11em}
         .td-certsig span{font-weight:400;color:#8A8474;font-size:0.85em}
         .td-certsigline{border-top:1px solid #1C2520;margin-bottom:0.4em}
-        .td-certseal{width:4.2em;height:4.2em;border:0.2em solid #B98A2F;border-radius:50%;display:flex;
+        .td-certseal{width:3.6em;height:3.6em;border:0.2em solid #B98A2F;border-radius:50%;display:flex;
           align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:900;font-size:1.4em;
           color:#134E33;background:radial-gradient(circle,#FDF8EC 60%,#F2E5C4);overflow:hidden}
-        .td-certlogo{height:4.6em;max-width:14em;object-fit:contain;margin-bottom:0.5em}
+        .td-certlogo{height:3.4em;max-width:12em;object-fit:contain;margin-bottom:0.3em}
         .td-certseallogo{width:78%;height:78%;object-fit:contain}
         .td-certsignimg{height:2.8em;max-width:11em;object-fit:contain;display:block;margin:0 auto -0.15em}
         .td-upbox{border:1px dashed #B98A2F;background:#FDF8EC;border-radius:8px;padding:12px 12px 6px;margin-bottom:13px}
