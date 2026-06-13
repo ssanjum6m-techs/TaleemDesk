@@ -185,21 +185,19 @@ function renderMD(text) {
   return out;
 }
 
-// // ---------- Claude API ----------
-// // ---------- PREVIEW MODE: direct call (works inside Claude artifacts) ----------
-// async function askClaude(prompt) {
-//   const res = await fetch("https://api.anthropic.com/v1/messages", {
-//     method: "POST",
-//     headers: { "Content-Type": "application/json" },
-//     body: JSON.stringify({
-//       model: "claude-sonnet-4-6",
-//       max_tokens: 1500,
-//       messages: [{ role: "user", content: prompt }],
-//     }),
-//   });
-//   const data = await res.json();
-//   return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-// }
+// ---------- Claude API ----------
+// ---------- Calls our own secure backend (/api/generate.js) ----------
+// The Anthropic API key lives only on the server (Vercel env variable).
+async function askClaude(prompt) {
+  const res = await fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Generation failed");
+  return data.text;
+}
 
 export default function TaleemDesk() {
   const [tab, setTab] = useState("lesson");
@@ -331,7 +329,7 @@ Structure (use markdown headings ## and ### and bullet lists with -):
 If language is Bilingual, write key instructions in English with Urdu support phrases in brackets. Keep it practical, no fluff.`
       );
       setOutput(text);
-    } catch (e) { setError("Generation failed. Please try again."); }
+    } catch (e) { setError(e.message || "Generation failed. Please try again."); }
     setLoading(false);
   };
 
@@ -387,7 +385,7 @@ Rules:
         );
         setOutput(text);
       }
-    } catch (e) { setError("Generation failed. Please try again."); }
+    } catch (e) { setError(e.message || "Generation failed. Please try again."); }
     setLoading(false);
   };
 

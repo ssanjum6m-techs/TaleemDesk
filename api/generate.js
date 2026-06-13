@@ -1,6 +1,5 @@
-// api/generate.js — Vercel Serverless Function
+// api/generate.js — Vercel Serverless Function (with detailed error reporting)
 // Your ANTHROPIC_API_KEY stays safely here on the server.
-// The browser never sees it.
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -13,15 +12,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Prompt is required" });
   }
 
-  // Safety limit — protects your API bill from abuse
   if (prompt.length > 6000) {
     return res.status(400).json({ error: "Prompt too long" });
   }
 
+  // Clear message if the key is missing entirely
   if (!process.env.ANTHROPIC_API_KEY) {
-    return res
-      .status(500)
-      .json({ error: "ANTHROPIC_API_KEY is not set in Vercel environment variables" });
+    return res.status(500).json({
+      error: "NO KEY: ANTHROPIC_API_KEY is not set in Vercel. Go to Settings → Environment Variables, add it, then Redeploy.",
+    });
   }
 
   try {
@@ -41,9 +40,14 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // If Anthropic rejects the request, send the REAL reason back to the screen
     if (!response.ok) {
-      console.error("Anthropic API error:", data);
-      return res.status(500).json({ error: "AI generation failed. Check API key and credits." });
+      const reason =
+        (data && data.error && data.error.message) ||
+        JSON.stringify(data).slice(0, 300);
+      return res.status(response.status).json({
+        error: `ANTHROPIC ERROR (${response.status}): ${reason}`,
+      });
     }
 
     const text = (data.content || [])
@@ -53,7 +57,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ text });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "SERVER ERROR: " + (err.message || String(err)) });
   }
 }
