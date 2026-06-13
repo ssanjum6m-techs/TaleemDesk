@@ -415,7 +415,7 @@ Rules:
   const downloadPDF = async () => {
     if (!output || pdfBusy) return;
     setPdfBusy(true);
-    let clone = null;
+    let holder = null;
     try {
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
@@ -428,19 +428,29 @@ Rules:
       }
       const fmt = currentFormat();
       const src = document.getElementById("td-pdf-source");
-      // FIX for blank PDFs: clone the hidden source and place the clone at the
-      // top of the visible page (behind everything) so the capture engine sees it.
-      clone = src.cloneNode(true);
+      if (!src) throw new Error("Nothing to export yet.");
+
+      // Build a fully visible, on-screen wrapper so the capture engine can see it.
+      holder = document.createElement("div");
+      holder.style.position = "fixed";
+      holder.style.left = "0";
+      holder.style.top = "0";
+      holder.style.zIndex = "2147483647";
+      holder.style.background = "#fff";
+      holder.style.width = fmt.w + "px";
+      holder.style.opacity = "0.01"; // visible to renderer, invisible to user
+      holder.style.pointerEvents = "none";
+
+      const clone = src.cloneNode(true);
       clone.removeAttribute("id");
-      clone.style.position = "absolute";
-      clone.style.left = window.scrollX + "px";
-      clone.style.top = window.scrollY + "px";
-      clone.style.zIndex = "-99999";
+      clone.style.position = "static";
+      clone.style.left = "auto";
+      clone.style.top = "auto";
       clone.style.width = fmt.w + "px";
       clone.style.background = "#fff";
       clone.style.border = "none";
       clone.style.borderRadius = "0";
-      // certificates: fix to full export size inside the clone
+      clone.style.boxShadow = "none";
       const certEl = clone.querySelector(".td-cert");
       if (certEl) {
         certEl.style.fontSize = "16px";
@@ -448,29 +458,43 @@ Rules:
         certEl.style.height = "744px";
         certEl.style.aspectRatio = "auto";
       }
-      document.body.appendChild(clone);
+      holder.appendChild(clone);
+      document.body.appendChild(holder);
+
+      // wait for images (logo/signature/letterhead) to finish loading
+      const imgs = Array.from(holder.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((r) => { img.onload = r; img.onerror = r; })
+        )
+      );
+      // small delay so fonts/layout settle
+      await new Promise((r) => setTimeout(r, 350));
 
       const rawName = certData
         ? `${doc.docType}-${certData.studentName || ""}`
         : tab === "lesson" ? (lp.topic || "Lesson-Plan") : doc.docType;
       const fileName =
         "TaleemDesk-" + rawName.replace(/[^A-Za-z0-9\u0600-\u06FF ]/g, "").trim().replace(/\s+/g, "-").slice(0, 45) + ".pdf";
+
       await window
         .html2pdf()
         .set({
           margin: certData ? 0 : fmt.size === "a5" ? [6, 6, 8, 6] : [10, 10, 12, 10],
           filename: fileName,
           image: { type: "jpeg", quality: 0.96 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false },
           jsPDF: { unit: "mm", format: fmt.size, orientation: fmt.orient },
           pagebreak: { mode: ["css", "legacy"] },
         })
         .from(clone)
         .save();
     } catch (e) {
-      setError("PDF download failed — please try the Print button instead.");
+      setError("PDF download failed: " + (e.message || "try the Print button instead."));
     }
-    if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+    if (holder && holder.parentNode) holder.parentNode.removeChild(holder);
     setPdfBusy(false);
   };
 
