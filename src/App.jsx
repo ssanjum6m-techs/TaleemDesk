@@ -437,7 +437,7 @@ Rules:
       holder.style.top = "0";
       holder.style.zIndex = "2147483647";
       holder.style.background = "#fff";
-      holder.style.width = fmt.w + "px";
+      holder.style.width = (certData ? 1122 : fmt.w) + "px";
       holder.style.opacity = "0.01"; // visible to renderer, invisible to user
       holder.style.pointerEvents = "none";
 
@@ -446,19 +446,21 @@ Rules:
       clone.style.position = "static";
       clone.style.left = "auto";
       clone.style.top = "auto";
-      clone.style.width = fmt.w + "px";
+      clone.style.width = (certData ? 1122 : fmt.w) + "px";
       clone.style.background = "#fff";
       clone.style.border = "none";
       clone.style.borderRadius = "0";
       clone.style.boxShadow = "none";
       const certEl = clone.querySelector(".td-cert");
       if (certEl) {
+        // Lock the certificate to exact landscape-A4 proportions (297 x 210 mm).
+        // Capturing at this exact ratio means it maps to ONE page with no cut-off.
         certEl.style.fontSize = "15px";
-        certEl.style.width = "1052px";
-        certEl.style.minHeight = "744px";
-        certEl.style.height = "744px";
+        certEl.style.width = "1122px";
+        certEl.style.height = "793px";
         certEl.style.aspectRatio = "auto";
         certEl.style.display = "block";
+        certEl.style.boxSizing = "border-box";
       }
       holder.appendChild(clone);
       document.body.appendChild(holder);
@@ -489,7 +491,7 @@ Rules:
           image: { type: "jpeg", quality: 0.96 },
           html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false },
           jsPDF: { unit: "mm", format: fmt.size, orientation: fmt.orient },
-          pagebreak: { mode: ["css", "legacy"] },
+          pagebreak: certData ? { mode: [] } : { mode: ["css", "legacy"] },
         })
         .from(clone)
         .save();
@@ -622,8 +624,8 @@ Rules:
           aspect-ratio:1052/744;font-family:'Inter',sans-serif;color:#1C2520}
         .td-pdfland .td-cert{width:1052px;height:744px;aspect-ratio:auto}
         .td-certinner{border:0.18em solid #B98A2F;height:100%;box-sizing:border-box;position:relative;
-          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
-          padding:1.1em 3em;overflow:hidden}
+          display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;text-align:center;
+          padding:1.4em 3em;overflow:hidden}
         .td-certcorner{position:absolute;width:5em;height:5em;background:
           linear-gradient(135deg,#134E33 0 38%,#B98A2F 38% 48%,transparent 48%)}
         .td-certcorner.tl{top:-0.1em;left:-0.1em}
