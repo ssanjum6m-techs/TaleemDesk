@@ -483,24 +483,41 @@ Rules:
       // CERTIFICATE: capture, then shrink-to-fit onto exactly ONE page (never cut).
       if (certData) {
         const target = certEl || clone;
-        const canvas = await window.html2canvas(target, {
-          scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false,
-        });
-        const { jsPDF } = window.jspdf || window;
-        const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
-        const pageW = pdf.internal.pageSize.getWidth();   // 297
-        const pageH = pdf.internal.pageSize.getHeight();  // 210
-        const margin = 6;
-        const availW = pageW - margin * 2;
-        const availH = pageH - margin * 2;
-        const imgRatio = canvas.width / canvas.height;
-        let drawW = availW;
-        let drawH = drawW / imgRatio;
-        if (drawH > availH) { drawH = availH; drawW = drawH * imgRatio; }
-        const x = (pageW - drawW) / 2;
-        const y = (pageH - drawH) / 2;
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, y, drawW, drawH);
-        pdf.save(fileName);
+        // html2pdf bundle exposes these on window; fall back across known names.
+        const h2c = window.html2canvas || (window.html2pdf && window.html2pdf.html2canvas);
+        const JsPDFCtor =
+          (window.jspdf && window.jspdf.jsPDF) ||
+          window.jsPDF ||
+          (window.html2pdf && window.html2pdf.jsPDF);
+        if (!h2c || !JsPDFCtor) {
+          // Fallback: use html2pdf's own single-page pipeline
+          await window.html2pdf().set({
+            margin: 4,
+            filename: fileName,
+            image: { type: "jpeg", quality: 0.96 },
+            html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false },
+            jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+            pagebreak: { mode: ["avoid-all"] },
+          }).from(target).save();
+        } else {
+          const canvas = await h2c(target, {
+            scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false,
+          });
+          const pdf = new JsPDFCtor({ unit: "mm", format: "a4", orientation: "landscape" });
+          const pageW = pdf.internal.pageSize.getWidth();
+          const pageH = pdf.internal.pageSize.getHeight();
+          const margin = 6;
+          const availW = pageW - margin * 2;
+          const availH = pageH - margin * 2;
+          const imgRatio = canvas.width / canvas.height;
+          let drawW = availW;
+          let drawH = drawW / imgRatio;
+          if (drawH > availH) { drawH = availH; drawW = drawH * imgRatio; }
+          const x = (pageW - drawW) / 2;
+          const y = (pageH - drawH) / 2;
+          pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, y, drawW, drawH);
+          pdf.save(fileName);
+        }
       } else {
         // Letters / forms / lesson plans: normal multi-page flow.
         await window.html2pdf().set({
